@@ -41,7 +41,7 @@ with col_f1:
   selected_kabupaten = st.selectbox("1. Pilih Kabupaten", kabupaten_list)
 
 
-# Memuat data sheet terpilih
+# Memuat data sheet terpilih dan membersihkannya dari baris kosong
 @st.cache_data
 def load_sheet_data(kab_name):
   df_raw = pd.read_excel(EXCEL_FILE, sheet_name=kab_name)
@@ -56,7 +56,12 @@ def load_sheet_data(kab_name):
       header_row = idx
       break
   df = pd.read_excel(EXCEL_FILE, sheet_name=kab_name, skiprows=header_row)
+  df.columns = df.iloc[0]
+  df = df[1:].reset_index(drop=True)
   df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
+  # Buang baris yang nilai Kode Kios-nya kosong atau bertuliskan 'Kode Kios'
+  if "Kode Kios" in df.columns:
+    df = df[df["Kode Kios"].notna() & (df["Kode Kios"] != "Kode Kios")]
   return df
 
 
@@ -95,7 +100,7 @@ with col_f2:
       "2. Pilih Kecamatan", ["-- Pilih Kecamatan --"] + kecamatan_list
   )
 
-if selected_kecamatan != "-- Pilih Kecamatan --":
+if selected_kecamatan != "-- Semua Kecamatan --":
   df_filtered = df_kab[df_kab[col_kec] == selected_kecamatan]
 else:
   df_filtered = df_kab
@@ -161,7 +166,7 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("### 📄 Daftar Nota & Eksekusi Verifikasi")
 
-    # Sistem Navigasi Nota Satu per Satu agar fokus melihat gambar/bukti
+    # Sistem Navigasi Nota Satu per Satu
     if "current_index" not in st.session_state:
       st.session_state.current_index = 0
     if (
@@ -224,10 +229,7 @@ if selected_display_kios != "-- Pilih Kios --":
       if pupuk_info:
         st.markdown(f"🌾 **Alokasi:** {' | '.join(pupuk_info)}")
 
-      st.markdown(
-          f"Status Saat Ini: **{current_status}**",
-          help="Status verifikasi nota ini",
-      )
+      st.markdown(f"Status Saat Ini: **{current_status}**")
 
       st.markdown("#### Tombol Aksi Verifikasi:")
       b_1, b_2, b_3 = st.columns(3)
@@ -255,7 +257,6 @@ if selected_display_kios != "-- Pilih Kios --":
 
       st.markdown("#### 🖼️ Preview Bukti Nota:")
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
-        # Streamlit iframe atau image embedding agar tampil langsung tanpa klik link
         try:
           st.components.v1.iframe(nota_url, height=450, scrolling=True)
           st.markdown(
