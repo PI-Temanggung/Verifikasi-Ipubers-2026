@@ -184,7 +184,7 @@ if selected_display_kios != "-- Pilih Kios --":
     # Tombol Navigasi Atas
     c_nav1, c_nav2, c_nav3 = st.columns([1, 2, 1])
     with c_nav1:
-      if st.button("⬅️ Sebelumnya", width="stretch"):
+      if st.button("⬅️ Sebelumnya"):
         if st.session_state.current_index > 0:
           st.session_state.current_index -= 1
           st.rerun()
@@ -195,7 +195,7 @@ if selected_display_kios != "-- Pilih Kios --":
           unsafe_allow_html=True,
       )
     with c_nav3:
-      if st.button("Selanjutnya ➡️", width="stretch"):
+      if st.button("Selanjutnya ➡️"):
         if st.session_state.current_index < len(df_kios) - 1:
           st.session_state.current_index += 1
           st.rerun()
@@ -227,19 +227,19 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("#### Tombol Aksi Verifikasi:")
       b_1, b_2, b_3 = st.columns(3)
       with b_1:
-        if st.button("✅ TERIMA", type="primary", width="stretch"):
+        if st.button("✅ TERIMA", type="primary"):
           st.session_state.verifikasi_status[key_state] = "Diterima"
           if st.session_state.current_index < len(df_kios) - 1:
             st.session_state.current_index += 1
           st.rerun()
       with b_2:
-        if st.button("❌ TOLAK", width="stretch"):
+        if st.button("❌ TOLAK"):
           st.session_state.verifikasi_status[key_state] = "Ditolak"
           if st.session_state.current_index < len(df_kios) - 1:
             st.session_state.current_index += 1
           st.rerun()
       with b_3:
-        if st.button("🔄 Reset", width="stretch"):
+        if st.button("🔄 Reset"):
           if key_state in st.session_state.verifikasi_status:
             del st.session_state.verifikasi_status[key_state]
           st.rerun()
