@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide",
 )
 
-EXCEL_FILE = "Monitoring IPubers Jateng 4 (2).xlsx"
+EXCEL_FILE = "IPUBERS-AGUSTUS.xlsx"
 
 
 @st.cache_data
