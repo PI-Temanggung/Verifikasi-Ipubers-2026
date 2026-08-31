@@ -59,7 +59,6 @@ def load_sheet_data(kab_name):
   df.columns = df.iloc[0]
   df = df[1:].reset_index(drop=True)
   df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
-  # Buang baris yang nilai Kode Kios-nya kosong atau bertuliskan 'Kode Kios'
   if "Kode Kios" in df.columns:
     df = df[df["Kode Kios"].notna() & (df["Kode Kios"] != "Kode Kios")]
   return df
@@ -100,13 +99,12 @@ with col_f2:
       "2. Pilih Kecamatan", ["-- Pilih Kecamatan --"] + kecamatan_list
   )
 
-if selected_kecamatan != "-- Semua Kecamatan --":
+if selected_kecamatan != "-- Pilih Kecamatan --":
   df_filtered = df_kab[df_kab[col_kec] == selected_kecamatan]
 else:
   df_filtered = df_kab
 
 with col_f3:
-  # Menampilkan kombinasi Kode Kios dan Nama Kios agar mudah dikenali
   df_filtered["Display_Kios"] = (
       df_filtered[col_kios_code].astype(str)
       + " - "
@@ -124,7 +122,6 @@ if "verifikasi_status" not in st.session_state:
   st.session_state.verifikasi_status = {}
 
 if selected_display_kios != "-- Pilih Kios --":
-  # Ekstrak kembali kode kios asli dari string pilihan
   selected_kode_kios = selected_display_kios.split(" - ")[0]
   df_kios = df_filtered[
       df_filtered[col_kios_code].astype(str) == selected_kode_kios
@@ -133,7 +130,6 @@ if selected_display_kios != "-- Pilih Kios --":
   if len(df_kios) == 0:
     st.warning("Tidak ada data transaksi untuk kios ini.")
   else:
-    # Metrik ringkas
     kios_indices = df_kios.index.tolist()
     cek_count = sum(
         1
@@ -166,7 +162,6 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("### 📄 Daftar Nota & Eksekusi Verifikasi")
 
-    # Sistem Navigasi Nota Satu per Satu
     if "current_index" not in st.session_state:
       st.session_state.current_index = 0
     if (
@@ -189,7 +184,7 @@ if selected_display_kios != "-- Pilih Kios --":
     # Tombol Navigasi Atas
     c_nav1, c_nav2, c_nav3 = st.columns([1, 2, 1])
     with c_nav1:
-      if st.button("⬅️ Sebelumnya", use_container_width=True):
+      if st.button("⬅️ Sebelumnya", width="stretch"):
         if st.session_state.current_index > 0:
           st.session_state.current_index -= 1
           st.rerun()
@@ -200,14 +195,13 @@ if selected_display_kios != "-- Pilih Kios --":
           unsafe_allow_html=True,
       )
     with c_nav3:
-      if st.button("Selanjutnya ➡️", use_container_width=True):
+      if st.button("Selanjutnya ➡️", width="stretch"):
         if st.session_state.current_index < len(df_kios) - 1:
           st.session_state.current_index += 1
           st.rerun()
 
     st.markdown("---")
 
-    # Tampilan Utama: Kiri Detail & Aksi, Kanan Preview Nota
     col_det, col_prev = st.columns([1, 1])
 
     with col_det:
@@ -221,7 +215,6 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown(f"**NIK:** {nik_val}")
       st.markdown(f"**Tanggal Tebus:** {tgl_val}")
 
-      # Info Pupuk
       pupuk_info = []
       for p in ["Urea", "NPK", "SP36", "ZA", "Organik"]:
         if p in df_kios.columns and pd.notna(row_data.get(p)):
@@ -234,19 +227,19 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("#### Tombol Aksi Verifikasi:")
       b_1, b_2, b_3 = st.columns(3)
       with b_1:
-        if st.button("✅ TERIMA", type="primary", use_container_width=True):
+        if st.button("✅ TERIMA", type="primary", width="stretch"):
           st.session_state.verifikasi_status[key_state] = "Diterima"
           if st.session_state.current_index < len(df_kios) - 1:
             st.session_state.current_index += 1
           st.rerun()
       with b_2:
-        if st.button("❌ TOLAK", use_container_width=True):
+        if st.button("❌ TOLAK", width="stretch"):
           st.session_state.verifikasi_status[key_state] = "Ditolak"
           if st.session_state.current_index < len(df_kios) - 1:
             st.session_state.current_index += 1
           st.rerun()
       with b_3:
-        if st.button("🔄 Reset", use_container_width=True):
+        if st.button("🔄 Reset", width="stretch"):
           if key_state in st.session_state.verifikasi_status:
             del st.session_state.verifikasi_status[key_state]
           st.rerun()
@@ -258,7 +251,7 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("#### 🖼️ Preview Bukti Nota:")
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
         try:
-          st.components.v1.iframe(nota_url, height=450, scrolling=True)
+          st.iframe(nota_url, height=450, scrolling=True)
           st.markdown(
               f"🔗 [Buka Link Asli di Tab Baru]({nota_url}) (Jika preview"
               " diblokir browser)"
@@ -268,7 +261,6 @@ if selected_display_kios != "-- Pilih Kios --":
       else:
         st.warning("Link dokumen / gambar nota tidak tersedia.")
 
-  # Tombol Download Hasil
   st.markdown("---")
   st.subheader("📥 Download Hasil Verifikasi")
   if st.button("📊 Siapkan File Excel Hasil Verifikasi", type="primary"):
