@@ -144,7 +144,7 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("---")
 
-    # Layout Utama: Kiri (Detail & Aksi), Kanan (Preview Gambar Nota Langsung)
+    # Layout Utama: Kiri (Detail & Aksi), Kanan (Preview Nota Langsung)
     col_kiri, col_kanan = st.columns([1, 1], gap="large")
 
     with col_kiri:
@@ -183,19 +183,21 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("#### Aksi Verifikasi:")
       b1, b2, b3 = st.columns(3)
       with b1:
-        if st.button("✅ TERIMA", type="primary", use_container_width=True):
+        if st.button(
+            "✅ TERIMA", type="primary", key=f"terima_{row_idx}", width="stretch"
+        ):
           st.session_state.verifikasi_dict[row_idx] = "TERIMA"
           if pos < len(indices) - 1:
             st.session_state.current_pos += 1
           st.rerun()
       with b2:
-        if st.button("❌ TOLAK", use_container_width=True):
+        if st.button("❌ TOLAK", key=f"tolak_{row_idx}", width="stretch"):
           st.session_state.verifikasi_dict[row_idx] = "TOLAK"
           if pos < len(indices) - 1:
             st.session_state.current_pos += 1
           st.rerun()
       with b3:
-        if st.button("🔄 Reset", use_container_width=True):
+        if st.button("🔄 Reset", key=f"reset_{row_idx}", width="stretch"):
           if row_idx in st.session_state.verifikasi_dict:
             del st.session_state.verifikasi_dict[row_idx]
           st.rerun()
@@ -204,7 +206,9 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("#### Navigasi Nota:")
       nav_prev, nav_info, nav_next = st.columns([1, 2, 1])
       with nav_prev:
-        if st.button("⬅️ Sebelumnya", use_container_width=True):
+        if st.button(
+            "⬅️ Sebelumnya", key=f"prev_{row_idx}", width="stretch"
+        ):
           if pos > 0:
             st.session_state.current_pos -= 1
             st.rerun()
@@ -215,35 +219,26 @@ if selected_display_kios != "-- Pilih Kios --":
             unsafe_allow_html=True,
         )
       with nav_next:
-        if st.button("Selanjutnya ➡️", use_container_width=True):
+        if st.button("Selanjutnya ➡️", key=f"next_{row_idx}", width="stretch"):
           if pos < len(indices) - 1:
             st.session_state.current_pos += 1
             st.rerun()
 
     with col_kanan:
-      st.subheader("🖼️ Preview Gambar Nota")
+      st.subheader("🖼️ Preview Nota")
       nota_url = row_data.get(col_url, None) if col_url else None
 
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
-        # Menampilkan gambar langsung di halaman menggunakan tag HTML img & st.image
-        try:
-          st.image(
-              str(nota_url),
-              caption=f"Nota Transaksi: {trx_val}",
-              use_container_width=True,
-          )
-        except Exception:
-          # Fallback jika st.image gagal memuat URL langsung
-          st.markdown(
-              f'<img src="{nota_url}" width="100%"'
-              ' style="border-radius:8px; border:1px solid #ddd;" />',
-              unsafe_allow_html=True,
-          )
-
+        # Menampilkan dokumen nota langsung di dalam frame aplikasi secara embedded
         st.markdown(
-            f"🔗 [Buka Link Asli di Tab Baru]({nota_url}) (Jika gambar gagal"
-            " dimuat browser)",
-            help="Link eksternal asli",
+            f'<iframe src="{nota_url}" width="100%" height="520px"'
+            ' style="border: 1px solid #ccc; border-radius: 8px;'
+            ' background-color: white;"></iframe>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"🔗 [Buka Link Asli di Tab Baru]({nota_url}) (Jika tampilan di atas"
+            " memerlukan izin popup/browser)"
         )
       else:
         st.warning(
