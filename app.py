@@ -144,27 +144,27 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("---")
 
-    # Layout Utama: Kiri (Detail & Aksi), Kanan (Preview Nota Langsung)
-    col_kiri, col_kanan = st.columns([1, 1], gap="large")
+    # Layout Utama: Kolom Kiri (Detail & Aksi memanjang ke bawah) lebih sempit, Kolom Kanan (Preview Nota) lebih besar (Lebar 1:2)
+    col_kiri, col_kanan = st.columns([1, 2], gap="large")
 
     with col_kiri:
-      st.subheader("📄 Detail Transaksi Nota")
+      st.subheader("📄 Detail Transaksi")
       trx_val = row_data.get(col_trx, "-") if col_trx else "-"
       petani_val = row_data.get(col_petani, "-") if col_petani else "-"
       nik_val = row_data.get("NIK", "-")
       tgl_val = row_data.get("Tanggal Tebus", "-")
 
-      st.markdown(f"**No Transaksi:** `{trx_val}`")
-      st.markdown(f"**Nama Petani:** {petani_val}")
-      st.markdown(f"**NIK:** {nik_val}")
-      st.markdown(f"**Tanggal Tebus:** {tgl_val}")
+      st.markdown(f"**No Transaksi:**\n`{trx_val}`")
+      st.markdown(f"**Nama Petani:**\n{petani_val}")
+      st.markdown(f"**NIK:**\n{nik_val}")
+      st.markdown(f"**Tanggal Tebus:**\n{tgl_val}")
 
       pupuk_info = []
       for p in ["Urea", "NPK", "SP36", "ZA", "Organik"]:
         if p in df_original.columns and pd.notna(row_data.get(p)):
           pupuk_info.append(f"{p}: **{row_data.get(p)} kg**")
       if pupuk_info:
-        st.markdown(f"🌾 **Alokasi Pupuk:** {' | '.join(pupuk_info)}")
+        st.markdown(f"🌾 **Alokasi Pupuk:**\n" + "\n".join(pupuk_info))
 
       current_status = st.session_state.verifikasi_dict.get(
           row_idx, "Belum Dicek"
@@ -175,70 +175,63 @@ if selected_display_kios != "-- Pilih Kios --":
           else ("red" if current_status == "TOLAK" else "orange")
       )
       st.markdown(
-          f"Status Verifikasi Saat Ini: <span"
+          f"Status: <span"
           f" style='color:{status_color}; font-weight:bold;'>{current_status}</span>",
           unsafe_allow_html=True,
       )
 
+      st.markdown("---")
       st.markdown("#### Aksi Verifikasi:")
-      b1, b2, b3 = st.columns(3)
-      with b1:
-        if st.button(
-            "✅ TERIMA", type="primary", key=f"terima_{row_idx}", width="stretch"
-        ):
-          st.session_state.verifikasi_dict[row_idx] = "TERIMA"
-          if pos < len(indices) - 1:
-            st.session_state.current_pos += 1
-          st.rerun()
-      with b2:
-        if st.button("❌ TOLAK", key=f"tolak_{row_idx}", width="stretch"):
-          st.session_state.verifikasi_dict[row_idx] = "TOLAK"
-          if pos < len(indices) - 1:
-            st.session_state.current_pos += 1
-          st.rerun()
-      with b3:
-        if st.button("🔄 Reset", key=f"reset_{row_idx}", width="stretch"):
-          if row_idx in st.session_state.verifikasi_dict:
-            del st.session_state.verifikasi_dict[row_idx]
-          st.rerun()
+      # Tombol dibuat tersusun vertikal memanjang ke bawah
+      if st.button("✅ TERIMA", type="primary", key=f"terima_{row_idx}", width="stretch"):
+        st.session_state.verifikasi_dict[row_idx] = "TERIMA"
+        if pos < len(indices) - 1:
+          st.session_state.current_pos += 1
+        st.rerun()
+
+      if st.button("❌ TOLAK", key=f"tolak_{row_idx}", width="stretch"):
+        st.session_state.verifikasi_dict[row_idx] = "TOLAK"
+        if pos < len(indices) - 1:
+          st.session_state.current_pos += 1
+        st.rerun()
+
+      if st.button("🔄 Reset Status", key=f"reset_{row_idx}", width="stretch"):
+        if row_idx in st.session_state.verifikasi_dict:
+          del st.session_state.verifikasi_dict[row_idx]
+        st.rerun()
 
       st.markdown("---")
       st.markdown("#### Navigasi Nota:")
-      nav_prev, nav_info, nav_next = st.columns([1, 2, 1])
-      with nav_prev:
-        if st.button(
-            "⬅️ Sebelumnya", key=f"prev_{row_idx}", width="stretch"
-        ):
-          if pos > 0:
-            st.session_state.current_pos -= 1
-            st.rerun()
-      with nav_info:
-        st.markdown(
-            f"<p style='text-align: center; font-weight: bold; margin-top:"
-            f" 8px;'>Nota ke-{pos + 1} dari {len(indices)}</p>",
-            unsafe_allow_html=True,
-        )
-      with nav_next:
-        if st.button("Selanjutnya ➡️", key=f"next_{row_idx}", width="stretch"):
-          if pos < len(indices) - 1:
-            st.session_state.current_pos += 1
-            st.rerun()
+      if st.button("⬅️ Sebelumnya", key=f"prev_{row_idx}", width="stretch"):
+        if pos > 0:
+          st.session_state.current_pos -= 1
+          st.rerun()
+
+      st.markdown(
+          f"<p style='text-align: center; font-weight: bold; margin: 5px"
+          f" 0;'>Nota {pos + 1} dari {len(indices)}</p>",
+          unsafe_allow_html=True,
+      )
+
+      if st.button("Selanjutnya ➡️", key=f"next_{row_idx}", width="stretch"):
+        if pos < len(indices) - 1:
+          st.session_state.current_pos += 1
+          st.rerun()
 
     with col_kanan:
-      st.subheader("🖼️ Preview Nota")
+      st.subheader("🖼️ Preview Nota (Diperbesar)")
       nota_url = row_data.get(col_url, None) if col_url else None
 
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
-        # Menampilkan dokumen nota langsung di dalam frame aplikasi secara embedded
+        # Iframe diperbesar ukurannya menjadi tinggi 750px agar sangat jelas
         st.markdown(
-            f'<iframe src="{nota_url}" width="100%" height="520px"'
-            ' style="border: 1px solid #ccc; border-radius: 8px;'
+            f'<iframe src="{nota_url}" width="100%" height="750px"'
+            ' style="border: 2px solid #0055ff; border-radius: 8px;'
             ' background-color: white;"></iframe>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            f"🔗 [Buka Link Asli di Tab Baru]({nota_url}) (Jika tampilan di atas"
-            " memerlukan izin popup/browser)"
+            f"🔗 [Buka Link Asli di Tab Baru]({nota_url})"
         )
       else:
         st.warning(
