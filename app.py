@@ -182,27 +182,26 @@ if selected_display_kios != "-- Pilih Kios --":
 
       st.markdown("---")
       st.markdown("#### Aksi Verifikasi:")
-      # Tombol dibuat tersusun vertikal memanjang ke bawah
-      if st.button("✅ TERIMA", type="primary", key=f"terima_{row_idx}", width="stretch"):
+      if st.button("✅ TERIMA", type="primary", key=f"terima_{row_idx}"):
         st.session_state.verifikasi_dict[row_idx] = "TERIMA"
         if pos < len(indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
-      if st.button("❌ TOLAK", key=f"tolak_{row_idx}", width="stretch"):
+      if st.button("❌ TOLAK", key=f"tolak_{row_idx}"):
         st.session_state.verifikasi_dict[row_idx] = "TOLAK"
         if pos < len(indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
-      if st.button("🔄 Reset Status", key=f"reset_{row_idx}", width="stretch"):
+      if st.button("🔄 Reset Status", key=f"reset_{row_idx}"):
         if row_idx in st.session_state.verifikasi_dict:
           del st.session_state.verifikasi_dict[row_idx]
         st.rerun()
 
       st.markdown("---")
       st.markdown("#### Navigasi Nota:")
-      if st.button("⬅️ Sebelumnya", key=f"prev_{row_idx}", width="stretch"):
+      if st.button("⬅️ Sebelumnya", key=f"prev_{row_idx}"):
         if pos > 0:
           st.session_state.current_pos -= 1
           st.rerun()
@@ -213,7 +212,7 @@ if selected_display_kios != "-- Pilih Kios --":
           unsafe_allow_html=True,
       )
 
-      if st.button("Selanjutnya ➡️", key=f"next_{row_idx}", width="stretch"):
+      if st.button("Selanjutnya ➡️", key=f"next_{row_idx}"):
         if pos < len(indices) - 1:
           st.session_state.current_pos += 1
           st.rerun()
@@ -223,56 +222,89 @@ if selected_display_kios != "-- Pilih Kios --":
       nota_url = row_data.get(col_url, None) if col_url else None
 
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
-        # Iframe diperbesar ukurannya menjadi tinggi 750px agar sangat jelas
         st.markdown(
             f'<iframe src="{nota_url}" width="100%" height="750px"'
             ' style="border: 2px solid #0055ff; border-radius: 8px;'
             ' background-color: white;"></iframe>',
             unsafe_allow_html=True,
         )
-        st.markdown(
-            f"🔗 [Buka Link Asli di Tab Baru]({nota_url})"
-        )
+        st.markdown(f"🔗 [Buka Link Asli di Tab Baru]({nota_url})")
       else:
         st.warning(
             "Link atau URL bukti nota tidak tersedia pada baris data ini."
         )
 
-  # --- TOMBOL DOWNLOAD HASIL ---
-  st.markdown("---")
-  st.subheader("📥 Download File Excel Hasil Pengecekan")
+# --- PANEL DOWNLOAD HASIL (SEMUA DATA / FILTER) ---
+st.markdown("---")
+st.subheader("📥 Download File Excel Hasil Pengecekan")
+st.markdown(
+    "Pilih jenis file yang ingin di-download. Seluruh format data asli Anda"
+    " dipertahankan, dengan tambahan kolom **Status_Verifikasi** di bagian"
+    " ujung."
+)
+
+dl_col1, dl_col2 = st.columns(2)
+
+with dl_col1:
+  st.markdown("#### 1. Download Seluruh Data (Semua File)")
   st.markdown(
-      "File hasil download mempertahankan seluruh format asli Excel Anda dan"
-      " hanya menambahkan kolom **Status_Verifikasi** di bagian paling ujung."
+      "Mendownload seluruh baris data dari file master asli dengan rekap"
+      " status verifikasi."
   )
+  if st.button("📊 Download Semua Data Excel", type="primary"):
+    df_export_all = df_original.copy()
+    status_list_all = [
+        st.session_state.verifikasi_dict.get(idx, "Belum Dicek")
+        for idx in df_export_all.index
+    ]
+    df_export_all["Status_Verifikasi"] = status_list_all
 
-  if st.button("📊 Siapkan File Excel untuk Di-download", type="primary"):
-    df_export = df_original.copy()
-
-    status_list = []
-    for idx, _ in df_export.iterrows():
-      if idx in st.session_state.verifikasi_dict:
-        status_list.append(st.session_state.verifikasi_dict[idx])
-      else:
-        status_list.append("Belum Dicek")
-
-    df_export["Status_Verifikasi"] = status_list
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-      df_export.to_excel(writer, sheet_name=active_sheet, index=False)
-    processed_data = output.getvalue()
+    output_all = io.BytesIO()
+    with pd.ExcelWriter(output_all, engine="openpyxl") as writer:
+      df_export_all.to_excel(writer, sheet_name=active_sheet, index=False)
 
     st.download_button(
-        label="⬇️ Download Excel Hasil Verifikasi",
-        data=processed_data,
-        file_name=f"Hasil_Verifikasi_{selected_kecamatan}.xlsx",
+        label="⬇️ Simpan File (Semua Data)",
+        data=output_all.getvalue(),
+        file_name="Hasil_Verifikasi_Semua_Data.xlsx",
         mime=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
     )
-else:
-  st.info(
-      "👆 Silakan pilih Kecamatan dan Kode Kios di atas untuk mulai melakukan"
-      " pengecekan nota."
+
+with dl_col2:
+  st.markdown("#### 2. Download Data Kios/Kecamatan Terpilih")
+  st.markdown(
+      "Mendownload khusus data dari filter wilayah/kios yang sedang aktif"
+      " dipilih."
   )
+  if st.button("📊 Download Data Terpilih Saja"):
+    if selected_display_kios != "-- Pilih Kios --":
+      df_export_filtered = df_kios.copy()
+    elif selected_kecamatan != "-- Pilih Kecamatan --":
+      df_export_filtered = df_filtered.copy()
+    else:
+      df_export_filtered = df_original.copy()
+
+    status_list_filtered = [
+        st.session_state.verifikasi_dict.get(idx, "Belum Dicek")
+        for idx in df_export_filtered.index
+    ]
+    df_export_filtered["Status_Verifikasi"] = status_list_filtered
+
+    # Hapus kolom bantu 'Display_Kios' jika sempat ditambahkan
+    if "Display_Kios" in df_export_filtered.columns:
+      df_export_filtered = df_export_filtered.drop(columns=["Display_Kios"])
+
+    output_filtered = io.BytesIO()
+    with pd.ExcelWriter(output_filtered, engine="openpyxl") as writer:
+      df_export_filtered.to_excel(writer, sheet_name=active_sheet, index=False)
+
+    st.download_button(
+        label="⬇️ Simpan File (Data Terpilih)",
+        data=output_filtered.getvalue(),
+        file_name=f"Hasil_Verifikasi_Terpilih.xlsx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+    )
