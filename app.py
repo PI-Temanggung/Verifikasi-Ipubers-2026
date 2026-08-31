@@ -13,7 +13,6 @@ EXCEL_FILE = "IPUBERS-AGUSTUS.xlsx"
 # Memuat data secara utuh agar format asli tidak berubah saat di-download nanti
 @st.cache_data
 def load_excel_data():
-  # Membaca seluruh sheet menggunakan openpyxl / pandas
   xls = pd.ExcelFile(EXCEL_FILE)
   sheet_name = xls.sheet_names[0]
   df = pd.read_excel(EXCEL_FILE, sheet_name=sheet_name)
@@ -96,7 +95,6 @@ if "verifikasi_dict" not in st.session_state:
 if selected_display_kios != "-- Pilih Kios --":
   selected_kode_kios = selected_display_kios.split(" - ")[0]
 
-  # Ambil indeks baris asli dari dataframe utama agar posisi data akurat
   df_kios = df_filtered[
       df_filtered[col_kios_code].astype(str) == selected_kode_kios
   ]
@@ -106,7 +104,6 @@ if selected_display_kios != "-- Pilih Kios --":
   else:
     indices = df_kios.index.tolist()
 
-    # Navigasi Index Nota
     if "current_pos" not in st.session_state:
       st.session_state.current_pos = 0
     if (
@@ -123,7 +120,7 @@ if selected_display_kios != "-- Pilih Kios --":
     row_idx = indices[pos]
     row_data = df_original.loc[row_idx]
 
-    # Hitung Statistik Ringkas Kios Ini
+    # Statistik Ringkas
     total_nota = len(indices)
     sudah_cek = sum(
         1 for idx in indices if idx in st.session_state.verifikasi_dict
@@ -147,7 +144,7 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("---")
 
-    # Layout Utama: Kiri (Detail & Tombol Aksi/Navigasi), Kanan (Preview Nota)
+    # Layout Utama: Kiri (Detail & Aksi), Kanan (Preview Gambar Nota Langsung)
     col_kiri, col_kanan = st.columns([1, 1], gap="large")
 
     with col_kiri:
@@ -162,7 +159,6 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown(f"**NIK:** {nik_val}")
       st.markdown(f"**Tanggal Tebus:** {tgl_val}")
 
-      # Info alokasi pupuk jika ada
       pupuk_info = []
       for p in ["Urea", "NPK", "SP36", "ZA", "Organik"]:
         if p in df_original.columns and pd.notna(row_data.get(p)):
@@ -225,37 +221,46 @@ if selected_display_kios != "-- Pilih Kios --":
             st.rerun()
 
     with col_kanan:
-      st.subheader("🖼️ Preview Nota")
+      st.subheader("🖼️ Preview Gambar Nota")
       nota_url = row_data.get(col_url, None) if col_url else None
 
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
+        # Menampilkan gambar langsung di halaman menggunakan tag HTML img & st.image
         try:
-          st.iframe(str(nota_url), height=500, scrolling=True)
-          st.markdown(
-              f"🔗 [Buka Link Asli Nota di Tab Baru]({nota_url})"
-              " (Opsional/Jika preview diblokir)"
+          st.image(
+              str(nota_url),
+              caption=f"Nota Transaksi: {trx_val}",
+              use_container_width=True,
           )
         except Exception:
-          st.markdown(f"🔗 **[Buka Dokumen Nota]({nota_url})**")
+          # Fallback jika st.image gagal memuat URL langsung
+          st.markdown(
+              f'<img src="{nota_url}" width="100%"'
+              ' style="border-radius:8px; border:1px solid #ddd;" />',
+              unsafe_allow_html=True,
+          )
+
+        st.markdown(
+            f"🔗 [Buka Link Asli di Tab Baru]({nota_url}) (Jika gambar gagal"
+            " dimuat browser)",
+            help="Link eksternal asli",
+        )
       else:
         st.warning(
             "Link atau URL bukti nota tidak tersedia pada baris data ini."
         )
 
-  # --- TOMBOL DOWNLOAD HASIL (MENAMBAHKAN KOLOM TANPA MERUBAH FORMAT ASLI) ---
+  # --- TOMBOL DOWNLOAD HASIL ---
   st.markdown("---")
   st.subheader("📥 Download File Excel Hasil Pengecekan")
   st.markdown(
-      "File hasil download akan mempertahankan seluruh format asli Excel Anda"
-      " dan hanya menambahkan kolom **Status_Verifikasi** di bagian paling"
-      " ujung."
+      "File hasil download mempertahankan seluruh format asli Excel Anda dan"
+      " hanya menambahkan kolom **Status_Verifikasi** di bagian paling ujung."
   )
 
   if st.button("📊 Siapkan File Excel untuk Di-download", type="primary"):
-    # Buat salinan dari dataframe asli
     df_export = df_original.copy()
 
-    # Tambahkan kolom status verifikasi berdasarkan data yang sudah dicek
     status_list = []
     for idx, _ in df_export.iterrows():
       if idx in st.session_state.verifikasi_dict:
@@ -265,7 +270,6 @@ if selected_display_kios != "-- Pilih Kios --":
 
     df_export["Status_Verifikasi"] = status_list
 
-    # Simpan ke buffer BytesIO dalam format Excel (.xlsx)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
       df_export.to_excel(writer, sheet_name=active_sheet, index=False)
