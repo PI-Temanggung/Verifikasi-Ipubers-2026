@@ -56,9 +56,11 @@ def load_sheet_data(kab_name):
       header_row = idx
       break
   df = pd.read_excel(EXCEL_FILE, sheet_name=kab_name, skiprows=header_row)
-  df.columns = df.iloc[0]
+  df.columns = df.iloc[0].astype(str)
   df = df[1:].reset_index(drop=True)
-  df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
+  df = df.loc[
+      :, ~pd.Series(df.columns.astype(str)).str.startswith("Unnamed").values
+  ]
   if "Kode Kios" in df.columns:
     df = df[df["Kode Kios"].notna() & (df["Kode Kios"] != "Kode Kios")]
   return df
