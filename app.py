@@ -10,8 +10,8 @@ st.set_page_config(
 EXCEL_FILE = "IPUBERS-AGUSTUS.xlsx"
 
 
-# Memuat data secara utuh agar format asli tidak berubah saat di-download nanti
-@st.cache_data
+# Memuat data dengan cache otomatis
+@st.cache_data(ttl=60)
 def load_excel_data():
   xls = pd.ExcelFile(EXCEL_FILE)
   sheet_name = xls.sheet_names[0]
@@ -30,9 +30,9 @@ except Exception as e:
 
 st.title("🔍 Panel Verifikasi Nota Kios IPubers")
 st.markdown(
-    "Pilih Kecamatan dan Kode Kios di bawah untuk memverifikasi nota satu"
-    " per satu. Hasil verifikasi akan direkam tanpa mengubah format asli"
-    " file Excel."
+    "Pilih Kecamatan dan Kode Kios di bawah untuk memverifikasi nota. Status"
+    " verifikasi aman dan tidak akan hilang meskipun Anda menambah data baru di"
+    " Excel."
 )
 
 # --- PENCARIAN NAMA KOLOM SECARA FLEKSIBEL ---
@@ -54,10 +54,10 @@ col_trx = find_col(["no transaksi", "kode trx"])
 col_petani = find_col(["nama petani", "petani"])
 col_url = find_col(["url bukti", "link", "url"])
 
-if not col_kec or not col_kios_code:
+if not col_kec or not col_kios_code or not col_trx:
   st.error(
-      "Kolom 'Kecamatan' atau 'Kode Kios' tidak ditemukan di dalam file Excel"
-      f" Anda. Kolom yang ada: {cols}"
+      "Kolom penting ('Kecamatan', 'Kode Kios', atau 'No Transaksi') tidak"
+      f" lengkap di dalam file Excel Anda. Kolom yang terdeteksi: {cols}"
   )
   st.stop()
 
@@ -88,22 +88,52 @@ with f_col2:
 
 st.markdown("---")
 
-# Inisialisasi Session State untuk menyimpan status verifikasi
+# Inisialisasi Session State menggunakan Dictionary berbasis No Transaksi (Unik)
 if "verifikasi_dict" not in st.session_state:
   st.session_state.verifikasi_dict = {}
 
 if selected_display_kios != "-- Pilih Kios --":
   selected_kode_kios = selected_display_kios.split(" - ")[0]
 
-  df_kios = df_filtered[
+  df_kios_all = df_filtered[
       df_filtered[col_kios_code].astype(str) == selected_kode_kios
   ]
 
-  if len(df_kios) == 0:
-    st.warning("Tidak ada data transaksi untuk kios ini.")
-  else:
-    indices = df_kios.index.tolist()
+  # --- FILTER STATUS VERIFIKASI ---
+  st.markdown("#### 🔎 Filter Berdasarkan Status Pengecekan:")
+  status_filter_options = [
+      "Semua Nota",
+      "Belum Dicek",
+      "TERIMA",
+      "TOLAK",
+  ]
+  selected_status_filter = st.radio(
+      "Tampilkan nota dengan status:",
+      status_filter_options,
+      horizontal=True,
+  )
 
+  # Menyaring baris berdasarkan status verifikasi menggunakan No Transaksi sebagai kunci
+  filtered_indices = []
+  for idx, row in df_kios_all.iterrows():
+    trx_key = str(row[col_trx])
+    status = st.session_state.verifikasi_dict.get(trx_key, "Belum Dicek")
+
+    if selected_status_filter == "Belum Dicek" and status == "Belum Dicek":
+      filtered_indices.append(idx)
+    elif selected_status_filter == "TERIMA" and status == "TERIMA":
+      filtered_indices.append(idx)
+    elif selected_status_filter == "TOLAK" and status == "TOLAK":
+      filtered_indices.append(idx)
+    elif selected_status_filter == "Semua Nota":
+      filtered_indices.append(idx)
+
+  if len(filtered_indices) == 0:
+    st.warning(
+        f"Tidak ada data nota dengan status '{selected_status_filter}' untuk"
+        " kios ini."
+    )
+  else:
     if "current_pos" not in st.session_state:
       st.session_state.current_pos = 0
     if (
@@ -113,43 +143,46 @@ if selected_display_kios != "-- Pilih Kios --":
       st.session_state.current_pos = 0
       st.session_state.last_kios = selected_kode_kios
 
-    if st.session_state.current_pos >= len(indices):
-      st.session_state.current_pos = len(indices) - 1
+    if st.session_state.current_pos >= len(filtered_indices):
+      st.session_state.current_pos = 0
 
     pos = st.session_state.current_pos
-    row_idx = indices[pos]
+    row_idx = filtered_indices[pos]
     row_data = df_original.loc[row_idx]
+    current_trx_key = str(row_data[col_trx])
 
-    # Statistik Ringkas
-    total_nota = len(indices)
+    # Statistik Ringkas Kios
+    total_nota_kios = len(df_kios_all)
     sudah_cek = sum(
-        1 for idx in indices if idx in st.session_state.verifikasi_dict
+        1
+        for _, r in df_kios_all.iterrows()
+        if str(r[col_trx]) in st.session_state.verifikasi_dict
     )
     diterima = sum(
         1
-        for idx in indices
-        if st.session_state.verifikasi_dict.get(idx) == "TERIMA"
+        for _, r in df_kios_all.iterrows()
+        if st.session_state.verifikasi_dict.get(str(r[col_trx])) == "TERIMA"
     )
     ditolak = sum(
         1
-        for idx in indices
-        if st.session_state.verifikasi_dict.get(idx) == "TOLAK"
+        for _, r in df_kios_all.iterrows()
+        if st.session_state.verifikasi_dict.get(str(r[col_trx])) == "TOLAK"
     )
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Nota Kios", total_nota)
+    m1.metric("Total Nota Kios", total_nota_kios)
     m2.metric("Sudah Diverifikasi", sudah_cek)
     m3.metric("Diterima", diterima)
     m4.metric("Ditolak", ditolak)
 
     st.markdown("---")
 
-    # Layout Utama: Kolom Kiri (Detail & Aksi memanjang ke bawah) lebih sempit, Kolom Kanan (Preview Nota) lebih besar (Lebar 1:2)
+    # Layout Utama: Kolom Kiri (Detail & Aksi), Kolom Kanan (Preview Nota)
     col_kiri, col_kanan = st.columns([1, 2], gap="large")
 
     with col_kiri:
       st.subheader("📄 Detail Transaksi")
-      trx_val = row_data.get(col_trx, "-") if col_trx else "-"
+      trx_val = row_data.get(col_trx, "-")
       petani_val = row_data.get(col_petani, "-") if col_petani else "-"
       nik_val = row_data.get("NIK", "-")
       tgl_val = row_data.get("Tanggal Tebus", "-")
@@ -167,7 +200,7 @@ if selected_display_kios != "-- Pilih Kios --":
         st.markdown(f"🌾 **Alokasi Pupuk:**\n" + "\n".join(pupuk_info))
 
       current_status = st.session_state.verifikasi_dict.get(
-          row_idx, "Belum Dicek"
+          current_trx_key, "Belum Dicek"
       )
       status_color = (
           "green"
@@ -183,20 +216,20 @@ if selected_display_kios != "-- Pilih Kios --":
       st.markdown("---")
       st.markdown("#### Aksi Verifikasi:")
       if st.button("✅ TERIMA", type="primary", key=f"terima_{row_idx}"):
-        st.session_state.verifikasi_dict[row_idx] = "TERIMA"
-        if pos < len(indices) - 1:
+        st.session_state.verifikasi_dict[current_trx_key] = "TERIMA"
+        if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
       if st.button("❌ TOLAK", key=f"tolak_{row_idx}"):
-        st.session_state.verifikasi_dict[row_idx] = "TOLAK"
-        if pos < len(indices) - 1:
+        st.session_state.verifikasi_dict[current_trx_key] = "TOLAK"
+        if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
       if st.button("🔄 Reset Status", key=f"reset_{row_idx}"):
-        if row_idx in st.session_state.verifikasi_dict:
-          del st.session_state.verifikasi_dict[row_idx]
+        if current_trx_key in st.session_state.verifikasi_dict:
+          del st.session_state.verifikasi_dict[current_trx_key]
         st.rerun()
 
       st.markdown("---")
@@ -208,12 +241,13 @@ if selected_display_kios != "-- Pilih Kios --":
 
       st.markdown(
           f"<p style='text-align: center; font-weight: bold; margin: 5px"
-          f" 0;'>Nota {pos + 1} dari {len(indices)}</p>",
+          f" 0;'>Nota ke-{pos + 1} dari {len(filtered_indices)} (Kategori"
+          f" {selected_status_filter})</p>",
           unsafe_allow_html=True,
       )
 
       if st.button("Selanjutnya ➡️", key=f"next_{row_idx}"):
-        if pos < len(indices) - 1:
+        if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
           st.rerun()
 
@@ -234,28 +268,23 @@ if selected_display_kios != "-- Pilih Kios --":
             "Link atau URL bukti nota tidak tersedia pada baris data ini."
         )
 
-# --- PANEL DOWNLOAD HASIL (SEMUA DATA / FILTER) ---
+# --- PANEL DOWNLOAD HASIL ---
 st.markdown("---")
 st.subheader("📥 Download File Excel Hasil Pengecekan")
 st.markdown(
-    "Pilih jenis file yang ingin di-download. Seluruh format data asli Anda"
-    " dipertahankan, dengan tambahan kolom **Status_Verifikasi** di bagian"
-    " ujung."
+    "Pilih jenis file yang ingin di-download. Status verifikasi dicocokkan"
+    " berdasarkan No Transaksi secara akurat."
 )
 
 dl_col1, dl_col2 = st.columns(2)
 
 with dl_col1:
   st.markdown("#### 1. Download Seluruh Data (Semua File)")
-  st.markdown(
-      "Mendownload seluruh baris data dari file master asli dengan rekap"
-      " status verifikasi."
-  )
   if st.button("📊 Download Semua Data Excel", type="primary"):
     df_export_all = df_original.copy()
     status_list_all = [
-        st.session_state.verifikasi_dict.get(idx, "Belum Dicek")
-        for idx in df_export_all.index
+        st.session_state.verifikasi_dict.get(str(row[col_trx]), "Belum Dicek")
+        for _, row in df_export_all.iterrows()
     ]
     df_export_all["Status_Verifikasi"] = status_list_all
 
@@ -274,25 +303,20 @@ with dl_col1:
 
 with dl_col2:
   st.markdown("#### 2. Download Data Kios/Kecamatan Terpilih")
-  st.markdown(
-      "Mendownload khusus data dari filter wilayah/kios yang sedang aktif"
-      " dipilih."
-  )
   if st.button("📊 Download Data Terpilih Saja"):
     if selected_display_kios != "-- Pilih Kios --":
-      df_export_filtered = df_kios.copy()
+      df_export_filtered = df_kios_all.copy()
     elif selected_kecamatan != "-- Pilih Kecamatan --":
       df_export_filtered = df_filtered.copy()
     else:
       df_export_filtered = df_original.copy()
 
     status_list_filtered = [
-        st.session_state.verifikasi_dict.get(idx, "Belum Dicek")
-        for idx in df_export_filtered.index
+        st.session_state.verifikasi_dict.get(str(row[col_trx]), "Belum Dicek")
+        for _, row in df_export_filtered.iterrows()
     ]
     df_export_filtered["Status_Verifikasi"] = status_list_filtered
 
-    # Hapus kolom bantu 'Display_Kios' jika sempat ditambahkan
     if "Display_Kios" in df_export_filtered.columns:
       df_export_filtered = df_export_filtered.drop(columns=["Display_Kios"])
 
@@ -303,7 +327,7 @@ with dl_col2:
     st.download_button(
         label="⬇️ Simpan File (Data Terpilih)",
         data=output_filtered.getvalue(),
-        file_name=f"Hasil_Verifikasi_Terpilih.xlsx",
+        file_name="Hasil_Verifikasi_Terpilih.xlsx",
         mime=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
