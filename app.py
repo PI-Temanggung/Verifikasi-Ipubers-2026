@@ -3,8 +3,9 @@ import openpyxl
 import pandas as pd
 import streamlit as st
 
+# Konfigurasi Halaman dengan Tema Bersih
 st.set_page_config(
-    page_title="Verifikasi Nota IPubers", page_icon="🔍", layout="wide"
+    page_title="Panel Verifikasi Joko Winarno", page_icon="🔍", layout="wide"
 )
 
 EXCEL_FILE = "IPUBERS-AGUSTUS.xlsx"
@@ -28,11 +29,15 @@ except Exception as e:
   )
   st.stop()
 
-st.title("🔍 Panel Verifikasi Nota Kios IPubers")
+# --- HEADER UTAMA: JOKO WINARNO ---
 st.markdown(
-    "Pilih Kecamatan dan Kode Kios di bawah untuk memverifikasi nota. Status"
-    " verifikasi aman dan tidak akan hilang meskipun Anda menambah data baru di"
-    " Excel."
+    """
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 6px solid #0055ff; margin-bottom: 20px;">
+        <h1 style="color: #002b80; margin: 0; font-size: 26px;">Joko Winarno</h1>
+        <p style="color: #555555; margin: 5px 0 0 0; font-size: 15px;">Panel Verifikasi & Monitoring Nota Kios Pupuk Bersubsidi (IPubers)</p>
+    </div>
+""",
+    unsafe_allow_html=True,
 )
 
 # --- PENCARIAN NAMA KOLOM SECARA FLEKSIBEL ---
@@ -57,38 +62,40 @@ col_url = find_col(["url bukti", "link", "url"])
 if not col_kec or not col_kios_code or not col_trx:
   st.error(
       "Kolom penting ('Kecamatan', 'Kode Kios', atau 'No Transaksi') tidak"
-      f" lengkap di dalam file Excel Anda. Kolom yang terdeteksi: {cols}"
+      f" lengkap di dalam file Excel Anda. Kolom terdeteksi: {cols}"
   )
   st.stop()
 
-# --- FILTER UTAMA DI BAGIAN ATAS ---
-f_col1, f_col2 = st.columns(2)
+# --- SIDEBAR: PANEL KONTROL & FILTER (WARNA BIRU & BERSIH) ---
+st.sidebar.markdown(
+    "<h2 style='color: #002b80; font-size: 20px;'>🎛️ Navigasi & Filter</h2>",
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown("---")
 
-with f_col1:
-  kecamatan_list = sorted(df_original[col_kec].dropna().unique().tolist())
-  selected_kecamatan = st.selectbox(
-      "1. Pilih Kecamatan", ["-- Pilih Kecamatan --"] + kecamatan_list
-  )
+kecamatan_list = sorted(df_original[col_kec].dropna().unique().tolist())
+selected_kecamatan = st.sidebar.selectbox(
+    "1. Pilih Kecamatan", ["-- Pilih Kecamatan --"] + kecamatan_list
+)
 
 if selected_kecamatan != "-- Pilih Kecamatan --":
   df_filtered = df_original[df_original[col_kec] == selected_kecamatan]
 else:
   df_filtered = df_original
 
-with f_col2:
-  df_filtered["Display_Kios"] = (
-      df_filtered[col_kios_code].astype(str)
-      + " - "
-      + df_filtered[col_kios_name].astype(str)
-  )
-  kios_list = sorted(df_filtered["Display_Kios"].dropna().unique().tolist())
-  selected_display_kios = st.selectbox(
-      "2. Pilih Kode Kios", ["-- Pilih Kios --"] + kios_list
-  )
+df_filtered["Display_Kios"] = (
+    df_filtered[col_kios_code].astype(str)
+    + " - "
+    + df_filtered[col_kios_name].astype(str)
+)
+kios_list = sorted(df_filtered["Display_Kios"].dropna().unique().tolist())
+selected_display_kios = st.sidebar.selectbox(
+    "2. Pilih Kode Kios", ["-- Pilih Kios --"] + kios_list
+)
 
-st.markdown("---")
+st.sidebar.markdown("---")
 
-# Inisialisasi Session State menggunakan Dictionary berbasis No Transaksi (Unik)
+# Inisialisasi Session State
 if "verifikasi_dict" not in st.session_state:
   st.session_state.verifikasi_dict = {}
 
@@ -99,21 +106,17 @@ if selected_display_kios != "-- Pilih Kios --":
       df_filtered[col_kios_code].astype(str) == selected_kode_kios
   ]
 
-  # --- FILTER STATUS VERIFIKASI ---
-  st.markdown("#### 🔎 Filter Berdasarkan Status Pengecekan:")
+  st.sidebar.markdown("#### 🔎 Filter Status Nota:")
   status_filter_options = [
       "Semua Nota",
       "Belum Dicek",
       "TERIMA",
       "TOLAK",
   ]
-  selected_status_filter = st.radio(
-      "Tampilkan nota dengan status:",
-      status_filter_options,
-      horizontal=True,
+  selected_status_filter = st.sidebar.radio(
+      "Tampilkan berdasarkan:", status_filter_options
   )
 
-  # Menyaring baris berdasarkan status verifikasi menggunakan No Transaksi sebagai kunci
   filtered_indices = []
   for idx, row in df_kios_all.iterrows():
     trx_key = str(row[col_trx])
@@ -151,7 +154,7 @@ if selected_display_kios != "-- Pilih Kios --":
     row_data = df_original.loc[row_idx]
     current_trx_key = str(row_data[col_trx])
 
-    # Statistik Ringkas Kios
+    # Hitung Statistik Kios
     total_nota_kios = len(df_kios_all)
     sudah_cek = sum(
         1
@@ -169,6 +172,15 @@ if selected_display_kios != "-- Pilih Kios --":
         if st.session_state.verifikasi_dict.get(str(r[col_trx])) == "TOLAK"
     )
 
+    # Progress Bar Kios
+    progress_val = (
+        float(sudah_cek) / total_nota_kios if total_nota_kios > 0 else 0.0
+    )
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"**Progress Kios:** {sudah_cek}/{total_nota_kios} Nota")
+    st.sidebar.progress(progress_val)
+
+    # Statistik Ringkas di Atas
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Nota Kios", total_nota_kios)
     m2.metric("Sudah Diverifikasi", sudah_cek)
@@ -177,11 +189,15 @@ if selected_display_kios != "-- Pilih Kios --":
 
     st.markdown("---")
 
-    # Layout Utama: Kolom Kiri (Detail & Aksi), Kolom Kanan (Preview Nota)
+    # Layout Utama: Kiri (Detail & Aksi), Kanan (Preview Nota Diperbesar)
     col_kiri, col_kanan = st.columns([1, 2], gap="large")
 
     with col_kiri:
-      st.subheader("📄 Detail Transaksi")
+      st.markdown(
+          "<h3 style='color: #002b80; font-size: 18px;'>📄 Detail"
+          " Transaksi</h3>",
+          unsafe_allow_html=True,
+      )
       trx_val = row_data.get(col_trx, "-")
       petani_val = row_data.get(col_petani, "-") if col_petani else "-"
       nik_val = row_data.get("NIK", "-")
@@ -215,44 +231,57 @@ if selected_display_kios != "-- Pilih Kios --":
 
       st.markdown("---")
       st.markdown("#### Aksi Verifikasi:")
-      if st.button("✅ TERIMA", type="primary", key=f"terima_{row_idx}"):
+      if st.button(
+          "✅ TERIMA", type="primary", key=f"terima_{row_idx}", width="stretch"
+      ):
         st.session_state.verifikasi_dict[current_trx_key] = "TERIMA"
         if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
-      if st.button("❌ TOLAK", key=f"tolak_{row_idx}"):
+      if st.button(
+          "❌ TOLAK", key=f"tolak_{row_idx}", width="stretch"
+      ):
         st.session_state.verifikasi_dict[current_trx_key] = "TOLAK"
         if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
         st.rerun()
 
-      if st.button("🔄 Reset Status", key=f"reset_{row_idx}"):
+      if st.button(
+          "🔄 Reset Status", key=f"reset_{row_idx}", width="stretch"
+      ):
         if current_trx_key in st.session_state.verifikasi_dict:
           del st.session_state.verifikasi_dict[current_trx_key]
         st.rerun()
 
       st.markdown("---")
       st.markdown("#### Navigasi Nota:")
-      if st.button("⬅️ Sebelumnya", key=f"prev_{row_idx}"):
+      if st.button(
+          "⬅️ Sebelumnya", key=f"prev_{row_idx}", width="stretch"
+      ):
         if pos > 0:
           st.session_state.current_pos -= 1
           st.rerun()
 
       st.markdown(
           f"<p style='text-align: center; font-weight: bold; margin: 5px"
-          f" 0;'>Nota ke-{pos + 1} dari {len(filtered_indices)} (Kategori"
-          f" {selected_status_filter})</p>",
+          f" 0;'>Nota ke-{pos + 1} dari {len(filtered_indices)}</p>",
           unsafe_allow_html=True,
       )
 
-      if st.button("Selanjutnya ➡️", key=f"next_{row_idx}"):
+      if st.button(
+          "Selanjutnya ➡️", key=f"next_{row_idx}", width="stretch"
+      ):
         if pos < len(filtered_indices) - 1:
           st.session_state.current_pos += 1
           st.rerun()
 
     with col_kanan:
-      st.subheader("🖼️ Preview Nota (Diperbesar)")
+      st.markdown(
+          "<h3 style='color: #002b80; font-size: 18px;'>🖼️ Preview Nota"
+          " (Diperbesar)</h3>",
+          unsafe_allow_html=True,
+      )
       nota_url = row_data.get(col_url, None) if col_url else None
 
       if pd.notna(nota_url) and str(nota_url).startswith("http"):
@@ -270,17 +299,16 @@ if selected_display_kios != "-- Pilih Kios --":
 
 # --- PANEL DOWNLOAD HASIL ---
 st.markdown("---")
-st.subheader("📥 Download File Excel Hasil Pengecekan")
 st.markdown(
-    "Pilih jenis file yang ingin di-download. Status verifikasi dicocokkan"
-    " berdasarkan No Transaksi secara akurat."
+    "<h3 style='color: #002b80; font-size: 18px;'>📥 Download Hasil"
+    " Verifikasi Excel</h3>",
+    unsafe_allow_html=True,
 )
 
 dl_col1, dl_col2 = st.columns(2)
 
 with dl_col1:
-  st.markdown("#### 1. Download Seluruh Data (Semua File)")
-  if st.button("📊 Download Semua Data Excel", type="primary"):
+  if st.button("📊 Download Semua Data", type="primary", width="stretch"):
     df_export_all = df_original.copy()
     status_list_all = [
         st.session_state.verifikasi_dict.get(str(row[col_trx]), "Belum Dicek")
@@ -299,11 +327,11 @@ with dl_col1:
         mime=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
+        width="stretch",
     )
 
 with dl_col2:
-  st.markdown("#### 2. Download Data Kios/Kecamatan Terpilih")
-  if st.button("📊 Download Data Terpilih Saja"):
+  if st.button("📊 Download Data Terpilih Saja", width="stretch"):
     if selected_display_kios != "-- Pilih Kios --":
       df_export_filtered = df_kios_all.copy()
     elif selected_kecamatan != "-- Pilih Kecamatan --":
@@ -331,4 +359,5 @@ with dl_col2:
         mime=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ),
+        width="stretch",
     )
